@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -19,6 +20,7 @@ namespace DarkView
         private DefaultViewOption _selectedDefaultView;
         private string _selectedFontFamily;
         private double _selectedFontSize;
+        private Dictionary<string, (TextBlock Status, Button Register, Button Unregister)> _associationRows = new();
 
         public OptionsWindow()
         {
@@ -42,6 +44,86 @@ namespace DarkView
 
             _selectedFontSize = AppSettings.Instance.FontSize;
             SelectFontSize(_selectedFontSize);
+
+            _associationRows = new Dictionary<string, (TextBlock Status, Button Register, Button Unregister)>(StringComparer.OrdinalIgnoreCase)
+            {
+                [".ftg"] = (FtgStatusText, FtgRegisterButton, FtgUnregisterButton),
+            };
+            RefreshAssociationRows();
+        }
+
+        private void RefreshAssociationRows()
+        {
+            foreach (var ext in _associationRows.Keys)
+            {
+                RefreshAssociationRow(ext);
+            }
+        }
+
+        private void RefreshAssociationRow(string ext)
+        {
+            if (!_associationRows.TryGetValue(ext, out var row))
+            {
+                return;
+            }
+
+            bool registered;
+            try
+            {
+                registered = FileAssociations.IsRegistered(ext);
+            }
+            catch (Exception)
+            {
+                registered = false;
+            }
+
+            row.Status.Text = registered ? "Registered" : "Not registered";
+            row.Register.IsEnabled = !registered;
+            row.Unregister.IsEnabled = registered;
+        }
+
+        private void RegisterAssociation_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { Tag: string ext })
+            {
+                return;
+            }
+
+            try
+            {
+                FileAssociations.Register(ext);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Could not register {ext}:\n{ex.Message}",
+                               "File association",
+                               MessageBoxButton.OK,
+                               MessageBoxImage.Error);
+            }
+
+            RefreshAssociationRow(ext);
+        }
+
+        private void UnregisterAssociation_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { Tag: string ext })
+            {
+                return;
+            }
+
+            try
+            {
+                FileAssociations.Unregister(ext);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Could not unregister {ext}:\n{ex.Message}",
+                               "File association",
+                               MessageBoxButton.OK,
+                               MessageBoxImage.Error);
+            }
+
+            RefreshAssociationRow(ext);
         }
 
         private void PopulateFontList()
